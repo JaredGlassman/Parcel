@@ -1,19 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { readFileSync } from 'fs'
-import { resolve } from 'path'
-
-// Always load .env from project root — overrides any inherited shell/parent env vars
-function loadEnv() {
-  try {
-    const envPath = resolve(process.cwd(), '.env')
-    const text = readFileSync(envPath, 'utf8')
-    for (const line of text.split('\n')) {
-      const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/)
-      if (m) process.env[m[1]] = m[2].trim()
-    }
-  } catch { /* .env optional */ }
-}
-loadEnv()
 
 function getAnthropic() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
