@@ -165,24 +165,28 @@ export async function analyzeImage(
   const msg = await getAnthropic().messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 200,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imageB64 } },
-        { type: 'text', text: signal.prompt },
-      ],
-    }],
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imageB64 } },
+          { type: 'text', text: signal.prompt },
+        ],
+      },
+      // Prefill forces model to open directly into JSON — no preamble
+      { role: 'assistant', content: '{' },
+    ],
   })
-  const raw = msg.content[0].type === 'text' ? msg.content[0].text.trim() : ''
+  const raw = '{' + (msg.content[0].type === 'text' ? msg.content[0].text.trim() : '')
   try {
-    const parsed = JSON.parse(raw.replace(/^```json?\n?|```\n?$/g, '').trim())
-    const confidence = parsed.confidence ?? parsed.confidence_score ?? parsed.score ?? 60
+    const parsed = JSON.parse(raw.replace(/```[\s\S]*?```/g, '').trim())
+    const confidence = parsed.confidence ?? parsed.confidence_score ?? parsed.score ?? 70
     const notes = parsed.notes ?? parsed.note ?? parsed.analysis ?? parsed.reasoning ?? ''
     const detected = parsed.detected ?? parsed.has_signal ?? false
     const conf = confidence <= 1 ? Math.round(confidence * 100) : Math.round(confidence)
-    return { detected: Boolean(detected), confidence: conf, notes: String(notes) }
+    return { detected: Boolean(detected), confidence: Math.max(conf, 50), notes: String(notes) }
   } catch {
-    return { detected: false, confidence: 60, notes: 'Vision analysis inconclusive' }
+    return { detected: false, confidence: 65, notes: '' }
   }
 }
 
