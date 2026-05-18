@@ -29,6 +29,7 @@ type ApiLead = {
   neighborhoodAvgPrice?: number;
   phones?: string[];
   emails?: string[];
+  contactsLocked?: boolean;
 };
 
 const INDUSTRIES = ["Fencing", "Pool Builders", "Solar", "Roofing", "Landscaping", "HVAC"];
@@ -138,7 +139,17 @@ function LeadRow({ l, i, industry }: { l: ApiLead; i: number; industry: string }
           {l.analysis && (
             <p className="mt-1.5 text-[11px] text-ink-400 italic">{l.analysis}</p>
           )}
-          {((l.phones?.length ?? 0) > 0 || (l.emails?.length ?? 0) > 0) && (
+          {l.contactsLocked ? (
+            <div className="mt-2 flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-md border border-ink-200 bg-ink-50 px-1.5 py-0.5 text-[10px] text-ink-400">
+                <Phone size={9} /> •••-•••-••••
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md border border-ink-200 bg-ink-50 px-1.5 py-0.5 text-[10px] text-ink-400">
+                <AtSign size={9} /> ••••••@•••.com
+              </span>
+              <span className="text-[10px] text-ink-400">— unlocked with free leads</span>
+            </div>
+          ) : ((l.phones?.length ?? 0) > 0 || (l.emails?.length ?? 0) > 0) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {l.phones?.slice(0, 2).map((p, pi) => (
                 <a key={pi} href={`tel:${p}`}
@@ -313,8 +324,13 @@ export default function LeadPreview() {
     try {
       const res = await fetch(`/api/leads?zip=${displayZip}&industry=${encodeURIComponent(industry)}&limit=${PREVIEW_LIMIT}`);
       const data = await res.json();
-      if (!res.ok || data.error) { setErr(data.error ?? `Error ${res.status}`); }
-      else { setPreview(data.leads); setAnalyzed(data.analyzed ?? 0); }
+      if (res.status === 423 && data.exclusive) {
+        setErr(data.message ?? 'This area is exclusively reserved. Please try a different zip code.');
+      } else if (!res.ok || data.error) {
+        setErr(data.error ?? `Error ${res.status}`);
+      } else {
+        setPreview(data.leads); setAnalyzed(data.analyzed ?? 0);
+      }
     } catch { setErr("Network error — run `npm run dev` to start the local server."); }
     finally { setScanning(false); }
   };

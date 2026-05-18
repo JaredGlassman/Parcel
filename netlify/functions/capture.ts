@@ -5,6 +5,7 @@
  */
 import { getStore } from '@netlify/blobs'
 import { runLeadScan, skipTrace } from './_analysis.ts'
+import { appendLeadsToSheet } from './_sheets.ts'
 
 export interface Contact {
   id: string
@@ -70,6 +71,18 @@ export default async function handler(req: Request): Promise<Response> {
     return Response.json({ error: 'Free leads already claimed for this phone number. Upgrade for more.' }, { status: 409, headers: cors })
   }
 
+  // Exclusivity check — paid customers own this zip+industry
+  try {
+    const exclRaw = await store.get(`exclusive:${zip}:${industry}`)
+    if (exclRaw) {
+      const { companyName } = JSON.parse(exclRaw as string)
+      return Response.json({
+        exclusive: true,
+        message: `This area is exclusively served by ${companyName}. Please choose a different zip code.`,
+      }, { status: 423, headers: cors })
+    }
+  } catch { /* don't block on blob errors */ }
+
   // Run lead scan + skip-trace enrichment (phone/email)
   const { leads: rawLeads, analyzed } = await runLeadScan(zip, industry, LEAD_LIMIT)
   const contactMap = await skipTrace(rawLeads.map(l => ({ address: l.address, city: l.city, ownerName: l.ownerName })))
@@ -113,6 +126,8 @@ export default async function handler(req: Request): Promise<Response> {
     if (existingIdx >= 0) index[existingIdx] = indexEntry
     else index.unshift(indexEntry)
     await store.set('index', JSON.stringify(index))
+    // Write leads to Google Sheet
+    await appendLeadsToSheet(leads, { zip, industry, email, name })
     // Lock phone so it can't claim free leads again
     await store.set(`phone:${phone}`, JSON.stringify({ email, claimedAt: now }))
   } catch (err) {
