@@ -14,12 +14,6 @@
   port = 8888
   targetPort = 5173
 
-# API → Netlify functions (must come before SPA fallback)
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-  force = true
 
 
 # Long-cache hashed Vite assets; revalidate the HTML entry every request.
