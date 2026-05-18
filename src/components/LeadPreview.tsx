@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, ChevronDown, Loader2, MapPin,
-  ExternalLink, Lock, Mail, Download, User, Building2, Phone,
+  ExternalLink, Lock, Mail, Download, User, Building2, Phone, AtSign,
 } from "lucide-react";
 
 type ApiLead = {
@@ -27,6 +27,8 @@ type ApiLead = {
   daysSinceSale?: number | null;
   priceVariance?: number | null;
   neighborhoodAvgPrice?: number;
+  phones?: string[];
+  emails?: string[];
 };
 
 const INDUSTRIES = ["Fencing", "Pool Builders", "Solar", "Roofing", "Landscaping", "HVAC"];
@@ -135,6 +137,24 @@ function LeadRow({ l, i, industry }: { l: ApiLead; i: number; industry: string }
           </div>
           {l.analysis && (
             <p className="mt-1.5 text-[11px] text-ink-400 italic">{l.analysis}</p>
+          )}
+          {((l.phones?.length ?? 0) > 0 || (l.emails?.length ?? 0) > 0) && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {l.phones?.slice(0, 2).map((p, pi) => (
+                <a key={pi} href={`tel:${p}`}
+                  className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-100">
+                  <Phone size={9} strokeWidth={2.5} />
+                  {p.replace(/(\d{3})(\d{3})(\d{4})/, "($1) $2-$3")}
+                </a>
+              ))}
+              {l.emails?.slice(0, 1).map((e, ei) => (
+                <a key={ei} href={`mailto:${e}`}
+                  className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 hover:bg-blue-100">
+                  <AtSign size={9} strokeWidth={2.5} />
+                  {e}
+                </a>
+              ))}
+            </div>
           )}
         </div>
         <div className="shrink-0 pt-0.5"><ScoreRing score={l.score} /></div>
@@ -260,10 +280,11 @@ function CaptureModal({
 }
 
 function downloadCSV(leads: ApiLead[], industry: string, zip: string) {
-  const header = "Address,City,Owner,Mailing Address,Sale Price,Sale Date,Days Since Sale,Price vs Neighborhood,Year Built,Beds,Baths,Lot Size (sqft),Living Area (sqft),Signal,Score,Analysis,Maps URL";
+  const header = "Address,City,Owner,Phone 1,Phone 2,Email,Mailing Address,Sale Price,Sale Date,Days Since Sale,Price vs Neighborhood,Year Built,Beds,Baths,Lot Size (sqft),Living Area (sqft),Signal,Score,Analysis,Maps URL";
   const rows = leads.map((l) => [
-    l.address, l.city, l.ownerName ?? "", l.mailingAddress ?? "",
-    l.salePrice ?? "", l.saleDate ?? "",
+    l.address, l.city, l.ownerName ?? "",
+    l.phones?.[0] ?? "", l.phones?.[1] ?? "", l.emails?.[0] ?? "",
+    l.mailingAddress ?? "", l.salePrice ?? "", l.saleDate ?? "",
     l.daysSinceSale ?? "", l.priceVariance != null ? `${l.priceVariance}%` : "",
     l.yearBuilt ?? "", l.bedrooms ?? "", l.bathrooms ?? "",
     l.lotSize ?? "", l.livingArea ?? "",

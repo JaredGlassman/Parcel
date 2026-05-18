@@ -3,7 +3,7 @@
  * Verifies Stripe payment, runs full lead scan via shared pipeline, returns leads + CSV.
  */
 import Stripe from 'stripe'
-import { runLeadScan } from './_analysis.ts'
+import { runLeadScan, skipTrace } from './_analysis.ts'
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!)
@@ -46,7 +46,12 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const limit = parseInt(session.metadata?.limit ?? String(FULL_LIMIT), 10)
-  const { leads, analyzed } = await runLeadScan(zip, industry, limit)
+  const { leads: rawLeads, analyzed } = await runLeadScan(zip, industry, limit)
+  const contactMap = await skipTrace(rawLeads.map(l => ({ address: l.address, city: l.city, ownerName: l.ownerName })))
+  const leads = rawLeads.map(l => {
+    const contact = contactMap.get(l.address)
+    return contact ? { ...l, phones: contact.phones, emails: contact.emails } : l
+  })
 
   if (format === 'csv') {
     return new Response(toCSV(leads), {

@@ -4,7 +4,7 @@
  * Runs full 10-lead scan, stores contact in CRM, returns leads immediately.
  */
 import { getStore } from '@netlify/blobs'
-import { runLeadScan } from './_analysis.ts'
+import { runLeadScan, skipTrace } from './_analysis.ts'
 
 export interface Contact {
   id: string
@@ -70,8 +70,13 @@ export default async function handler(req: Request): Promise<Response> {
     return Response.json({ error: 'Free leads already claimed for this phone number. Upgrade for more.' }, { status: 409, headers: cors })
   }
 
-  // Run lead scan
-  const { leads, analyzed } = await runLeadScan(zip, industry, LEAD_LIMIT)
+  // Run lead scan + skip-trace enrichment (phone/email)
+  const { leads: rawLeads, analyzed } = await runLeadScan(zip, industry, LEAD_LIMIT)
+  const contactMap = await skipTrace(rawLeads.map(l => ({ address: l.address, city: l.city, ownerName: l.ownerName })))
+  const leads = rawLeads.map(l => {
+    const contact = contactMap.get(l.address)
+    return contact ? { ...l, phones: contact.phones, emails: contact.emails } : l
+  })
 
   // Store in CRM
   try {

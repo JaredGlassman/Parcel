@@ -186,6 +186,90 @@ export async function analyzeImage(
   }
 }
 
+// Skip-trace a batch of leads via Tracerfy ($0.02/match, pay-per-hit).
+// Builds a CSV, submits the job, polls until done, returns phone+email per address.
+export async function skipTrace(
+  leads: { address: string; city: string; ownerName: string }[],
+): Promise<Map<string, { phones: string[]; emails: string[] }>> {
+  const key = process.env.TRACERFY_API_KEY
+  if (!key || !leads.length) return new Map()
+
+  // Build CSV: id,first_name,last_name,property_address,property_city,property_state
+  const rows = leads.map((l, i) => {
+    const parts = l.ownerName.split(/\s+/)
+    const first = parts[0] ?? ''
+    const last = parts.slice(1).join(' ') ?? ''
+    const addrParts = l.city.split(',')
+    const state = (addrParts[1] ?? '').trim().split(' ')[0] ?? ''
+    const city = (addrParts[0] ?? '').trim()
+    return [i, first, last, l.address, city, state].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+  })
+  const csv = `id,first_name,last_name,property_address,property_city,property_state\n${rows.join('\n')}`
+
+  try {
+    // Submit job
+    const form = new FormData()
+    form.append('csv_file', new Blob([csv], { type: 'text/csv' }), 'leads.csv')
+    form.append('address_column', 'property_address')
+    form.append('city_column', 'property_city')
+    form.append('state_column', 'property_state')
+    form.append('first_name_column', 'first_name')
+    form.append('last_name_column', 'last_name')
+    form.append('trace_type', 'normal')
+
+    const submit = await fetch('https://tracerfy.com/v1/api/trace/', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+    })
+    if (!submit.ok) return new Map()
+    const { queue_id, estimated_wait_seconds } = (await submit.json()) as { queue_id: string; estimated_wait_seconds: number }
+
+    // Poll for results (cap at 20s)
+    const waitMs = Math.min((estimated_wait_seconds ?? 5) * 1000 + 2000, 20000)
+    await new Promise(r => setTimeout(r, waitMs))
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const poll = await fetch(`https://tracerfy.com/v1/api/queues/${queue_id}/`, {
+        headers: { Authorization: `Bearer ${key}` },
+      })
+      if (!poll.ok) break
+      const status = (await poll.json()) as { status: string; download_url?: string }
+      if (status.status !== 'complete' || !status.download_url) {
+        await new Promise(r => setTimeout(r, 3000))
+        continue
+      }
+      const csv = await (await fetch(status.download_url)).text()
+      return parseTracerfyResult(csv, leads)
+    }
+  } catch { /* skip trace is best-effort */ }
+
+  return new Map()
+}
+
+function parseTracerfyResult(
+  csv: string,
+  leads: { address: string }[],
+): Map<string, { phones: string[]; emails: string[] }> {
+  const out = new Map<string, { phones: string[]; emails: string[] }>()
+  const lines = csv.split('\n').filter(Boolean)
+  if (lines.length < 2) return out
+  const header = lines[0].split(',').map(h => h.trim().replace(/"/g, '').toLowerCase())
+  const idxId = header.indexOf('id')
+  const phoneIdxs = header.map((h, i) => h.includes('phone') ? i : -1).filter(i => i >= 0)
+  const emailIdxs = header.map((h, i) => h.includes('email') ? i : -1).filter(i => i >= 0)
+
+  for (const line of lines.slice(1)) {
+    const cols = line.match(/("(?:[^"]|"")*"|[^,]*)/g)?.map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"').trim()) ?? []
+    const id = parseInt(cols[idxId] ?? '', 10)
+    if (isNaN(id) || !leads[id]) continue
+    const phones = phoneIdxs.map(i => cols[i] ?? '').filter(Boolean)
+    const emails = emailIdxs.map(i => cols[i] ?? '').filter(Boolean)
+    out.set(leads[id].address, { phones, emails })
+  }
+  return out
+}
+
 export interface Lead {
   address: string
   city: string
@@ -208,6 +292,8 @@ export interface Lead {
   daysSinceSale: number | null
   priceVariance: number | null
   neighborhoodAvgPrice: number
+  phones: string[]
+  emails: string[]
 }
 
 export async function runLeadScan(zip: string, industry: string, limit: number): Promise<{ leads: Lead[]; analyzed: number }> {
@@ -260,6 +346,8 @@ export async function runLeadScan(zip: string, industry: string, limit: number):
         daysSinceSale,
         priceVariance,
         neighborhoodAvgPrice,
+        phones: [],
+        emails: [],
       } as Lead
     }),
   )
