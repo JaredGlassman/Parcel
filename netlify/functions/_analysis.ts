@@ -46,48 +46,56 @@ export const SIGNALS: Record<string, { prompt: string; noLabel: string }> = {
 export const nonResidential = (notes: string) =>
   /not a residential|commercial|highway|parking|industrial|forest|skip/i.test(notes)
 
-export async function geocodeZip(zip: string) {
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zip)}&country=US&format=json&limit=1`,
-    { headers: { 'User-Agent': 'Parcel/1.0 (hello@getparcel.io)' } },
-  )
-  const data = (await res.json()) as any[]
-  if (!data.length) throw new Error(`Zip ${zip} not found`)
-  const d = data[0]
-  return {
-    lat: parseFloat(d.lat),
-    lng: parseFloat(d.lon),
-    bbox: d.boundingbox.map(Number) as [number, number, number, number],
-  }
+interface AttomProperty {
+  lat: number
+  lng: number
+  address: string
+  city: string
+  apn: string
 }
 
-export async function reverseGeocode(lat: number, lng: number) {
-  try {
-    await new Promise((r) => setTimeout(r, 300))
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-      { headers: { 'User-Agent': 'Parcel/1.0 (hello@getparcel.io)' } },
-    )
-    const d = (await res.json()) as any
-    const a = d.address ?? {}
-    return {
-      address: [a.house_number, a.road].filter(Boolean).join(' ') || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-      city: [a.city ?? a.town ?? a.village, a.state].filter(Boolean).join(', '),
+export async function fetchAttomProperties(zip: string, need: number): Promise<AttomProperty[]> {
+  const attomKey = process.env.ATTOM_API_KEY
+  if (!attomKey) throw new Error('ATTOM_API_KEY not configured')
+
+  const results: AttomProperty[] = []
+  const pageSize = 100
+
+  for (let page = 1; results.length < need; page++) {
+    const url = new URL('https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/expandedprofile')
+    url.searchParams.set('postalcode', zip)
+    url.searchParams.set('page', String(page))
+    url.searchParams.set('pagesize', String(pageSize))
+
+    const res = await fetch(url.toString(), {
+      headers: { Accept: 'application/json', apikey: attomKey },
+    })
+    if (!res.ok) {
+      const body = await res.text()
+      throw new Error(`ATTOM ${res.status}: ${body.slice(0, 300)}`)
     }
-  } catch {
-    return { address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, city: '' }
-  }
-}
 
-export function gridScan(bbox: [number, number, number, number], count: number) {
-  const [south, north, west, east] = bbox
-  const latStep = 0.00072
-  const lngStep = 0.00072 / Math.cos(((south + north) / 2) * (Math.PI / 180))
-  const pts: { lat: number; lng: number; tags: Record<string, string> }[] = []
-  for (let lat = south + latStep / 2; lat < north; lat += latStep)
-    for (let lng = west + lngStep / 2; lng < east; lng += lngStep)
-      pts.push({ lat, lng, tags: {} })
-  return pts.sort(() => Math.random() - 0.5).slice(0, count)
+    const data = (await res.json()) as { property?: any[] }
+    const props = data.property || []
+    if (!props.length) break
+
+    for (const p of props) {
+      const loc = p.location || {}
+      const addr = p.address || {}
+      const lat = parseFloat(loc.latitude)
+      const lng = parseFloat(loc.longitude)
+      if (!lat || !lng) continue
+
+      const street = addr.line1 || addr.oneLine || ''
+      const city = [addr.locality, addr.countrySubd].filter(Boolean).join(', ')
+      const apn = p.identifier?.apn || String(p.identifier?.attomId || '')
+      results.push({ lat, lng, address: street, city, apn })
+    }
+
+    if (props.length < pageSize) break
+  }
+
+  return results
 }
 
 export async function getSatelliteImage(lat: number, lng: number): Promise<string | null> {
@@ -95,12 +103,13 @@ export async function getSatelliteImage(lat: number, lng: number): Promise<strin
   if (gmKey) {
     try {
       const res = await fetch(
-        `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=19&size=512x512&maptype=satellite&key=${gmKey}`,
+        `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=20&size=512x512&maptype=satellite&key=${gmKey}`,
       )
       if (res.ok && (res.headers.get('content-type') ?? '').startsWith('image'))
         return Buffer.from(await res.arrayBuffer()).toString('base64')
-    } catch { /* fall through */ }
+    } catch { /* fall through to ESRI */ }
   }
+  // ESRI World Imagery fallback (free, no key)
   const d = 0.00028
   const bbox = `${lng - d},${lat - d},${lng + d},${lat + d}`
   try {
@@ -131,7 +140,6 @@ export async function analyzeImage(
   const raw = msg.content[0].type === 'text' ? msg.content[0].text.trim() : ''
   try {
     const parsed = JSON.parse(raw.replace(/^```json?\n?|```\n?$/g, '').trim())
-    // Normalize alternate key names the model sometimes uses
     const confidence = parsed.confidence ?? parsed.confidence_score ?? parsed.score ?? 60
     const notes = parsed.notes ?? parsed.note ?? parsed.analysis ?? parsed.reasoning ?? ''
     const detected = parsed.detected ?? parsed.has_signal ?? false
@@ -155,33 +163,8 @@ export interface Lead {
 
 export async function runLeadScan(zip: string, industry: string, limit: number): Promise<{ leads: Lead[]; analyzed: number }> {
   const signal = SIGNALS[industry] ?? SIGNALS['Fencing']
-  const geo = await geocodeZip(zip)
 
-  // Try Overpass first, fall back to grid
-  let candidates: { lat: number; lng: number; tags: Record<string, string> }[] = []
-  try {
-    const mirrors = [
-      'https://overpass-api.de/api/interpreter',
-      'https://overpass.kumi.systems/api/interpreter',
-      'https://overpass.openstreetmap.ru/api/interpreter',
-    ]
-    const [south, north, west, east] = geo.bbox
-    const query = `[out:json][timeout:20];(way["building"~"^(house|residential|detached|bungalow|terrace)$"](${south},${west},${north},${east});node["addr:housenumber"]["addr:street"](${south},${west},${north},${east}););out center tags 60;`
-    for (const url of mirrors) {
-      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: `data=${encodeURIComponent(query)}` })
-      const ct = res.headers.get('content-type') ?? ''
-      if (!res.ok || !ct.includes('json')) continue
-      const data = (await res.json()) as { elements: any[] }
-      candidates = (data.elements || [])
-        .filter((e: any) => e.center?.lat || e.lat)
-        .map((e: any) => ({ lat: e.center?.lat ?? e.lat, lng: e.center?.lng ?? e.lon, tags: e.tags || {} }))
-      if (candidates.length) break
-    }
-  } catch { /* fall through to grid */ }
-
-  if (!candidates.length) candidates = gridScan(geo.bbox, limit * 8)
-
-  // Analyze candidates in parallel — take limit*3 max to stay within timeout
+  const candidates = await fetchAttomProperties(zip, limit * 3)
   const pool = candidates.sort(() => Math.random() - 0.5).slice(0, limit * 3)
 
   const results = await Promise.all(
@@ -190,17 +173,17 @@ export async function runLeadScan(zip: string, industry: string, limit: number):
       if (!img) return null
       const result = await analyzeImage(img, industry)
       if (result.detected || nonResidential(result.notes)) return null
-      const t = prop.tags
-      let address: string, city: string
-      if (t['addr:housenumber'] && t['addr:street']) {
-        address = `${t['addr:housenumber']} ${t['addr:street']}`
-        city = [t['addr:city'] ?? t['addr:town'], t['addr:state']].filter(Boolean).join(', ')
-      } else {
-        const rev = await reverseGeocode(prop.lat, prop.lng)
-        address = rev.address; city = rev.city
-      }
       const analysis = result.notes || signal.noLabel
-      return { address, city, lat: prop.lat, lng: prop.lng, signal: signal.noLabel, analysis, score: result.confidence, mapsUrl: `https://www.google.com/maps/@${prop.lat},${prop.lng},150m/data=!3m1!1e3` } as Lead
+      return {
+        address: prop.address,
+        city: prop.city,
+        lat: prop.lat,
+        lng: prop.lng,
+        signal: signal.noLabel,
+        analysis,
+        score: result.confidence,
+        mapsUrl: `https://www.google.com/maps/@${prop.lat},${prop.lng},150m/data=!3m1!1e3`,
+      } as Lead
     }),
   )
 
