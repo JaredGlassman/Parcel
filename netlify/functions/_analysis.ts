@@ -52,6 +52,15 @@ interface AttomProperty {
   address: string
   city: string
   apn: string
+  ownerName: string
+  mailingAddress: string
+  salePrice: number
+  saleDate: string
+  yearBuilt: string
+  bedrooms: string
+  bathrooms: string
+  lotSize: string
+  livingArea: string
 }
 
 export async function fetchAttomProperties(zip: string, need: number): Promise<AttomProperty[]> {
@@ -89,7 +98,34 @@ export async function fetchAttomProperties(zip: string, need: number): Promise<A
       const street = addr.line1 || addr.oneLine || ''
       const city = [addr.locality, addr.countrySubd].filter(Boolean).join(', ')
       const apn = p.identifier?.apn || String(p.identifier?.attomId || '')
-      results.push({ lat, lng, address: street, city, apn })
+
+      const owner = p.assessment?.owner || {}
+      const ownerName = [owner.owner1?.fullName, owner.owner2?.fullName].filter(Boolean).join(' & ')
+      const mailingAddress = owner.mailingAddressOneLine || ''
+
+      const sale = p.sale || {}
+      const salePrice = sale.amount?.saleAmt || 0
+      const saleDate = sale.saleSearchDate || sale.saleTransDate || ''
+
+      const summary = p.summary || {}
+      const building = p.building || {}
+      const lot = p.lot || {}
+
+      results.push({
+        lat, lng,
+        address: street,
+        city,
+        apn,
+        ownerName,
+        mailingAddress,
+        salePrice,
+        saleDate,
+        yearBuilt: String(summary.yearBuilt || ''),
+        bedrooms: String(building.rooms?.beds || ''),
+        bathrooms: String(building.rooms?.bathsTotal || ''),
+        lotSize: String(lot.lotSize2 || ''),
+        livingArea: String(building.size?.livingSize || building.size?.universalSize || ''),
+      })
     }
 
     if (props.length < pageSize) break
@@ -159,6 +195,16 @@ export interface Lead {
   analysis: string
   score: number
   mapsUrl: string
+  ownerName: string
+  mailingAddress: string
+  salePrice: number
+  saleDate: string
+  yearBuilt: string
+  bedrooms: string
+  bathrooms: string
+  lotSize: string
+  livingArea: string
+  apn: string
 }
 
 export async function runLeadScan(zip: string, industry: string, limit: number): Promise<{ leads: Lead[]; analyzed: number }> {
@@ -183,6 +229,16 @@ export async function runLeadScan(zip: string, industry: string, limit: number):
         analysis,
         score: result.confidence,
         mapsUrl: `https://www.google.com/maps/@${prop.lat},${prop.lng},150m/data=!3m1!1e3`,
+        ownerName: prop.ownerName,
+        mailingAddress: prop.mailingAddress,
+        salePrice: prop.salePrice,
+        saleDate: prop.saleDate,
+        yearBuilt: prop.yearBuilt,
+        bedrooms: prop.bedrooms,
+        bathrooms: prop.bathrooms,
+        lotSize: prop.lotSize,
+        livingArea: prop.livingArea,
+        apn: prop.apn,
       } as Lead
     }),
   )
