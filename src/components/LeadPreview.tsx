@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, ChevronDown, Loader2, MapPin,
-  ExternalLink, Lock, Mail, Download, User, Building2,
+  ExternalLink, Lock, Mail, Download, User, Building2, Phone,
 } from "lucide-react";
 
 type ApiLead = {
@@ -14,11 +14,74 @@ type ApiLead = {
   analysis: string;
   score: number;
   mapsUrl: string;
+  ownerName?: string;
+  mailingAddress?: string;
+  salePrice?: number;
+  saleDate?: string;
+  yearBuilt?: string;
+  bedrooms?: string;
+  bathrooms?: string;
+  lotSize?: string;
+  livingArea?: string;
+  apn?: string;
+  daysSinceSale?: number | null;
+  priceVariance?: number | null;
+  neighborhoodAvgPrice?: number;
 };
 
 const INDUSTRIES = ["Fencing", "Pool Builders", "Solar", "Roofing", "Landscaping", "HVAC"];
 const PREVIEW_LIMIT = 3;
 const FULL_LIMIT = 10;
+
+function fmt(n: number | string | undefined, suffix = "") {
+  if (!n || n === "0" || n === 0) return null;
+  return `${Number(n).toLocaleString()}${suffix}`;
+}
+function fmtPrice(n: number | undefined) {
+  if (!n || n === 0) return null;
+  return n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}K`;
+}
+function fmtAcres(sqft: string | undefined) {
+  if (!sqft || sqft === "0") return null;
+  const ac = parseFloat(sqft) / 43560;
+  return ac >= 0.1 ? `${ac.toFixed(2)} ac` : `${parseInt(sqft).toLocaleString()} sqft lot`;
+}
+function fmtAge(days: number | null | undefined) {
+  if (days == null) return null;
+  if (days < 14) return `Sold ${days}d ago`;
+  if (days < 60) return `Sold ${Math.round(days / 7)}wk ago`;
+  if (days < 365) return `Sold ${Math.round(days / 30)}mo ago`;
+  return `Sold ${Math.round(days / 365)}yr ago`;
+}
+
+function verticalStats(l: ApiLead, industry: string): string[] {
+  const price = fmtPrice(l.salePrice);
+  const variance = l.priceVariance != null
+    ? `${l.priceVariance > 0 ? "+" : ""}${l.priceVariance}% vs. neighborhood`
+    : null;
+  const sold = fmtAge(l.daysSinceSale);
+  const sqft = fmt(l.livingArea, " sqft");
+  const acres = fmtAcres(l.lotSize);
+  const built = l.yearBuilt ? `Built ${l.yearBuilt}` : null;
+  const beds = l.bedrooms && l.bathrooms ? `${l.bedrooms}bd / ${l.bathrooms}ba` : null;
+
+  switch (industry) {
+    case "Fencing":
+      return [acres, sold, price, variance].filter(Boolean) as string[];
+    case "Pool Builders":
+      return [acres, price, variance, sold].filter(Boolean) as string[];
+    case "Solar":
+      return [sqft, built, price, variance].filter(Boolean) as string[];
+    case "Roofing":
+      return [sqft, built, sold, price].filter(Boolean) as string[];
+    case "Landscaping":
+      return [acres, built, price, variance].filter(Boolean) as string[];
+    case "HVAC":
+      return [sqft, beds, built, price].filter(Boolean) as string[];
+    default:
+      return [price, sold, built].filter(Boolean) as string[];
+  }
+}
 
 function ScoreRing({ score }: { score: number }) {
   const r = 16, circ = 2 * Math.PI * r, dash = (score / 100) * circ;
@@ -39,26 +102,43 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-function LeadRow({ l, i }: { l: ApiLead; i: number }) {
+function LeadRow({ l, i, industry }: { l: ApiLead; i: number; industry: string }) {
+  const stats = verticalStats(l, industry);
   return (
     <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
       transition={{ delay: i * 0.06 }}
-      className="grid grid-cols-12 items-center gap-3 px-5 py-4 text-sm transition hover:bg-ink-50/50">
-      <div className="col-span-12 min-w-0 md:col-span-5">
-        <div className="truncate font-medium text-ink-900">{l.address}</div>
-        <div className="flex items-center gap-1 truncate text-xs text-ink-500">
-          {l.city}
-          <a href={l.mapsUrl} target="_blank" rel="noopener noreferrer"
-            className="ml-1 inline-flex items-center gap-0.5 text-brand-600 hover:text-brand-700">
-            <ExternalLink size={10} strokeWidth={2.5} />
-          </a>
+      className="px-5 py-4 text-sm transition hover:bg-ink-50/50">
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-medium text-ink-900">{l.address}</span>
+            {l.ownerName && (
+              <span className="text-xs text-ink-400 shrink-0">{l.ownerName}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 text-xs text-ink-500 mt-0.5">
+            <span className="truncate">{l.city}</span>
+            <a href={l.mapsUrl} target="_blank" rel="noopener noreferrer"
+              className="ml-1 inline-flex items-center text-brand-600 hover:text-brand-700">
+              <ExternalLink size={10} strokeWidth={2.5} />
+            </a>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <span className="rounded-md border border-ink-200 bg-ink-50 px-1.5 py-0.5 text-[10px] font-medium text-ink-700">
+              {l.signal}
+            </span>
+            {stats.map((s, si) => (
+              <span key={si} className="rounded-md border border-ink-100 bg-white px-1.5 py-0.5 text-[10px] text-ink-500">
+                {s}
+              </span>
+            ))}
+          </div>
+          {l.analysis && (
+            <p className="mt-1.5 text-[11px] text-ink-400 italic">{l.analysis}</p>
+          )}
         </div>
+        <div className="shrink-0 pt-0.5"><ScoreRing score={l.score} /></div>
       </div>
-      <div className="col-span-8 md:col-span-4">
-        <span className="rounded-md border border-ink-100 bg-ink-50 px-1.5 py-0.5 text-[10px] text-ink-700">{l.signal}</span>
-      </div>
-      <div className="col-span-12 text-[11px] text-ink-500 md:col-span-2">{l.analysis}</div>
-      <div className="col-span-4 flex justify-end md:col-span-1"><ScoreRing score={l.score} /></div>
     </motion.div>
   );
 }
@@ -67,15 +147,19 @@ function LockedRows({ count, onUnlock }: { count: number; onUnlock: () => void }
   return (
     <div className="relative">
       {Array.from({ length: Math.min(count, 4) }).map((_, i) => (
-        <div key={i} className="grid grid-cols-12 items-center gap-3 px-5 py-4"
+        <div key={i} className="px-5 py-4"
           style={{ filter: "blur(4px)", opacity: Math.max(0.05, 0.35 - i * 0.08) }}>
-          <div className="col-span-5 space-y-1.5">
-            <div className="h-3.5 w-40 rounded bg-ink-200" />
-            <div className="h-2.5 w-28 rounded bg-ink-100" />
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <div className="h-3.5 w-36 rounded bg-ink-200" />
+              <div className="h-3.5 w-24 rounded bg-ink-100" />
+            </div>
+            <div className="flex gap-1.5">
+              <div className="h-5 w-20 rounded-md bg-ink-100" />
+              <div className="h-5 w-16 rounded-md bg-ink-100" />
+              <div className="h-5 w-24 rounded-md bg-ink-100" />
+            </div>
           </div>
-          <div className="col-span-4"><div className="h-5 w-32 rounded-md bg-ink-100" /></div>
-          <div className="col-span-2"><div className="h-2.5 w-full rounded bg-ink-100" /></div>
-          <div className="col-span-1 flex justify-end"><div className="h-10 w-10 rounded-full bg-ink-100" /></div>
         </div>
       ))}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-white/50 via-white/90 to-white px-6 text-center">
@@ -84,7 +168,7 @@ function LockedRows({ count, onUnlock }: { count: number; onUnlock: () => void }
         </div>
         <div>
           <p className="text-sm font-semibold text-ink-900">{count} more qualified leads waiting</p>
-          <p className="mt-0.5 text-xs text-ink-500">Real addresses · satellite-verified · free with your email</p>
+          <p className="mt-0.5 text-xs text-ink-500">Real addresses · satellite-verified · free with your contact info</p>
         </div>
         <button onClick={onUnlock}
           className="inline-flex items-center gap-2 rounded-full bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(58,93,255,0.35)] transition hover:bg-brand-700">
@@ -96,7 +180,7 @@ function LockedRows({ count, onUnlock }: { count: number; onUnlock: () => void }
   );
 }
 
-function EmailModal({
+function CaptureModal({
   zip, industry, onClose, onDelivered,
 }: {
   zip: string; industry: string;
@@ -104,6 +188,7 @@ function EmailModal({
   onDelivered: (leads: ApiLead[], analyzed: number) => void;
 }) {
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
   const [loading, setLoading] = useState(false);
@@ -112,12 +197,13 @@ function EmailModal({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.includes("@")) { setErr("Enter a valid email address."); return; }
+    if (phone.replace(/\D/g, "").length < 10) { setErr("Enter a valid US phone number."); return; }
     setLoading(true); setErr("");
     try {
       const res = await fetch("/api/capture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name, company, zip, industry }),
+        body: JSON.stringify({ email, phone, name, company, zip, industry }),
       });
       const data = await res.json();
       if (!res.ok || data.error) { setErr(data.error ?? "Something went wrong."); setLoading(false); return; }
@@ -127,6 +213,13 @@ function EmailModal({
       setLoading(false);
     }
   };
+
+  const fields = [
+    { icon: Mail, placeholder: "you@company.com", value: email, set: setEmail, type: "email", label: "Work email *" },
+    { icon: Phone, placeholder: "(555) 000-0000", value: phone, set: setPhone, type: "tel", label: "Phone number *" },
+    { icon: User, placeholder: "Your name", value: name, set: setName, type: "text", label: "Name" },
+    { icon: Building2, placeholder: "Company", value: company, set: setCompany, type: "text", label: "Company" },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/40 px-4 backdrop-blur-sm"
@@ -139,11 +232,7 @@ function EmailModal({
         </div>
 
         <form onSubmit={submit} className="mt-6 space-y-3">
-          {[
-            { icon: Mail, placeholder: "you@company.com", value: email, set: setEmail, type: "email", label: "Work email *" },
-            { icon: User, placeholder: "Your name", value: name, set: setName, type: "text", label: "Name" },
-            { icon: Building2, placeholder: "Company", value: company, set: setCompany, type: "text", label: "Company" },
-          ].map(({ icon: Icon, placeholder, value, set, type, label }) => (
+          {fields.map(({ icon: Icon, placeholder, value, set, type, label }) => (
             <div key={label}>
               <label className="block text-xs font-medium text-ink-700">{label}</label>
               <div className="relative mt-1">
@@ -171,8 +260,15 @@ function EmailModal({
 }
 
 function downloadCSV(leads: ApiLead[], industry: string, zip: string) {
-  const header = "Address,City,Lat,Lng,Signal,Score,Analysis,Maps URL";
-  const rows = leads.map((l) => [l.address, l.city, l.lat, l.lng, l.signal, l.score, `"${l.analysis}"`, l.mapsUrl].join(","));
+  const header = "Address,City,Owner,Mailing Address,Sale Price,Sale Date,Days Since Sale,Price vs Neighborhood,Year Built,Beds,Baths,Lot Size (sqft),Living Area (sqft),Signal,Score,Analysis,Maps URL";
+  const rows = leads.map((l) => [
+    l.address, l.city, l.ownerName ?? "", l.mailingAddress ?? "",
+    l.salePrice ?? "", l.saleDate ?? "",
+    l.daysSinceSale ?? "", l.priceVariance != null ? `${l.priceVariance}%` : "",
+    l.yearBuilt ?? "", l.bedrooms ?? "", l.bathrooms ?? "",
+    l.lotSize ?? "", l.livingArea ?? "",
+    l.signal, l.score, `"${l.analysis}"`, l.mapsUrl,
+  ].join(","));
   const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
   const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `leads-${industry.replace(/\s+/g, "-").toLowerCase()}-${zip}.csv` });
   a.click(); URL.revokeObjectURL(a.href);
@@ -213,7 +309,7 @@ export default function LeadPreview() {
   return (
     <>
       {showModal && (
-        <EmailModal zip={displayZip} industry={industry}
+        <CaptureModal zip={displayZip} industry={industry}
           onClose={() => setShowModal(false)} onDelivered={onDelivered} />
       )}
 
@@ -226,7 +322,7 @@ export default function LeadPreview() {
               Preview leads in your <span className="gradient-text">market.</span>
             </h2>
             <p className="mt-4 text-balance text-lg text-ink-500">
-              Real satellite analysis. Get {FULL_LIMIT} qualified leads free — just enter your email.
+              Real satellite analysis. Get {FULL_LIMIT} qualified leads free — just enter your contact info.
             </p>
           </div>
 
@@ -284,7 +380,7 @@ export default function LeadPreview() {
               )}
 
               <p className="mt-4 text-[11px] leading-relaxed text-ink-400">
-                Powered by ESRI satellite imagery and Claude vision.
+                Powered by Google Maps satellite imagery and Claude vision.
               </p>
             </motion.form>
 
@@ -305,13 +401,6 @@ export default function LeadPreview() {
                   </span>
                   {scanning ? "Scanning…" : isDelivered ? `${leads.length} leads delivered` : `${leads.length} preview`}
                 </div>
-              </div>
-
-              <div className="hidden grid-cols-12 gap-3 border-b border-ink-100 px-5 py-2 text-[10px] font-medium uppercase tracking-wider text-ink-500 md:grid">
-                <div className="col-span-5">Address</div>
-                <div className="col-span-4">Signal</div>
-                <div className="col-span-2">Analysis</div>
-                <div className="col-span-1 text-right">Score</div>
               </div>
 
               <AnimatePresence mode="wait">
@@ -340,7 +429,7 @@ export default function LeadPreview() {
                 {!scanning && leads.length > 0 && (
                   <motion.div key="leads" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     <div className="divide-y divide-ink-100">
-                      {leads.map((l, i) => <LeadRow key={`${l.lat}-${l.lng}-${i}`} l={l} i={i} />)}
+                      {leads.map((l, i) => <LeadRow key={`${l.lat}-${l.lng}-${i}`} l={l} i={i} industry={industry} />)}
                     </div>
                     {lockedCount > 0 && (
                       <div className="border-t border-ink-100">

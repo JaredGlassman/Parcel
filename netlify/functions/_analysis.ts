@@ -205,12 +205,22 @@ export interface Lead {
   lotSize: string
   livingArea: string
   apn: string
+  daysSinceSale: number | null
+  priceVariance: number | null
+  neighborhoodAvgPrice: number
 }
 
 export async function runLeadScan(zip: string, industry: string, limit: number): Promise<{ leads: Lead[]; analyzed: number }> {
   const signal = SIGNALS[industry] ?? SIGNALS['Fencing']
 
   const candidates = await fetchAttomProperties(zip, limit * 3)
+
+  // Compute neighborhood average from all fetched properties
+  const prices = candidates.filter(c => c.salePrice > 0).map(c => c.salePrice)
+  const neighborhoodAvgPrice = prices.length
+    ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
+    : 0
+
   const pool = candidates.sort(() => Math.random() - 0.5).slice(0, limit * 3)
 
   const results = await Promise.all(
@@ -219,6 +229,14 @@ export async function runLeadScan(zip: string, industry: string, limit: number):
       if (!img) return null
       const result = await analyzeImage(img, industry)
       if (result.detected || nonResidential(result.notes)) return null
+
+      const daysSinceSale = prop.saleDate
+        ? Math.floor((Date.now() - new Date(prop.saleDate).getTime()) / 86400000)
+        : null
+      const priceVariance = (neighborhoodAvgPrice > 0 && prop.salePrice > 0)
+        ? Math.round(((prop.salePrice - neighborhoodAvgPrice) / neighborhoodAvgPrice) * 100)
+        : null
+
       const analysis = result.notes || signal.noLabel
       return {
         address: prop.address,
@@ -239,6 +257,9 @@ export async function runLeadScan(zip: string, industry: string, limit: number):
         lotSize: prop.lotSize,
         livingArea: prop.livingArea,
         apn: prop.apn,
+        daysSinceSale,
+        priceVariance,
+        neighborhoodAvgPrice,
       } as Lead
     }),
   )

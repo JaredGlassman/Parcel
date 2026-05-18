@@ -138,7 +138,7 @@ export default function Pricing() {
         </div>
 
         <p className="mt-10 text-center text-xs text-ink-500">
-          Month-to-month · 14-day money-back guarantee on your first delivery
+          Month-to-month · cancel anytime
         </p>
       </div>
     </section>

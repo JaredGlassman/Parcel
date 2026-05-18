@@ -43,7 +43,7 @@ export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return Response.json({ error: 'Method not allowed' }, { status: 405, headers: cors })
 
-  let email = '', name = '', company = '', zip = '78704', industry = 'Fencing'
+  let email = '', name = '', company = '', zip = '78704', industry = 'Fencing', phone = ''
   try {
     const body = await req.json()
     email = (body.email ?? '').trim().toLowerCase()
@@ -51,6 +51,7 @@ export default async function handler(req: Request): Promise<Response> {
     company = (body.company ?? '').trim()
     zip = (body.zip ?? zip).trim()
     industry = body.industry ?? industry
+    phone = (body.phone ?? '').replace(/\D/g, '').slice(-10)
   } catch {
     return Response.json({ error: 'Invalid request body' }, { status: 400, headers: cors })
   }
@@ -58,13 +59,22 @@ export default async function handler(req: Request): Promise<Response> {
   if (!email.includes('@')) {
     return Response.json({ error: 'Valid email required' }, { status: 400, headers: cors })
   }
+  if (phone.length < 10) {
+    return Response.json({ error: 'Valid US phone number required' }, { status: 400, headers: cors })
+  }
+
+  // Block phone numbers that already claimed free leads
+  const store = getStore('parcel-crm')
+  const phoneUsed = await store.get(`phone:${phone}`)
+  if (phoneUsed) {
+    return Response.json({ error: 'Free leads already claimed for this phone number. Upgrade for more.' }, { status: 409, headers: cors })
+  }
 
   // Run lead scan
   const { leads, analyzed } = await runLeadScan(zip, industry, LEAD_LIMIT)
 
   // Store in CRM
   try {
-    const store = getStore('parcel-crm')
     const now = new Date().toISOString()
     const deliveryId = crypto.randomUUID()
 
@@ -98,6 +108,8 @@ export default async function handler(req: Request): Promise<Response> {
     if (existingIdx >= 0) index[existingIdx] = indexEntry
     else index.unshift(indexEntry)
     await store.set('index', JSON.stringify(index))
+    // Lock phone so it can't claim free leads again
+    await store.set(`phone:${phone}`, JSON.stringify({ email, claimedAt: now }))
   } catch (err) {
     // Don't block lead delivery if CRM write fails
     console.error('CRM write failed:', err)
