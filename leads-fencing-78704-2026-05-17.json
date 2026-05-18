@@ -1,0 +1,158 @@
+{
+  "zip": "78704",
+  "industry": "Fencing",
+  "generatedAt": "2026-05-17T14:30:14.254Z",
+  "count": 15,
+  "leads": [
+    {
+      "address": "156 Little Texas Lane",
+      "city": "Austin, Texas",
+      "lat": 30.202416200000005,
+      "lng": -97.77451513092036,
+      "signal": "No fencing detected",
+      "analysis": "This appears to be a commercial or institutional property (parking area, courtyard, or campus facility) rather than a residential property.",
+      "score": 85,
+      "mapsUrl": "https://www.google.com/maps/@30.202416200000005,-97.77451513092036,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "South Capital of Texas Highway",
+      "city": "Austin, Texas",
+      "lat": 30.237696200000062,
+      "lng": -97.79868499414793,
+      "signal": "No fencing detected",
+      "analysis": "Not a residential property — this appears to be an aerial view of a road or driveway with vehicles, not a residential property with perimeter fencing",
+      "score": 95,
+      "mapsUrl": "https://www.google.com/maps/@30.237696200000062,-97.79868499414793,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "4702 Button Bend Road",
+      "city": "Austin, Texas",
+      "lat": 30.202416200000005,
+      "lng": -97.7386770578588,
+      "signal": "No fencing detected",
+      "analysis": "Not a residential property — skip",
+      "score": 99,
+      "mapsUrl": "https://www.google.com/maps/@30.202416200000005,-97.7386770578588,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "South Interstate 35",
+      "city": "Austin, Texas",
+      "lat": 30.20529620000001,
+      "lng": -97.75367904193108,
+      "signal": "No fencing detected",
+      "analysis": "This is a residential property, but no perimeter fencing is visible around the lot boundaries.",
+      "score": 85,
+      "mapsUrl": "https://www.google.com/maps/@30.20529620000001,-97.75367904193108,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "5007 Aberdeen Drive",
+      "city": "Austin, Texas",
+      "lat": 30.214656200000025,
+      "lng": -97.77951579227779,
+      "signal": "No fencing detected",
+      "analysis": "This is a residential property with scattered trees and structures, but no visible perimeter fencing enclosing the lot.",
+      "score": 85,
+      "mapsUrl": "https://www.google.com/maps/@30.214656200000025,-97.77951579227779,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "2508 Audubon Place",
+      "city": "Austin, Texas",
+      "lat": 30.23049620000005,
+      "lng": -97.74117738853751,
+      "signal": "No fencing detected",
+      "analysis": "No visible perimeter fencing enclosing these residential properties; yards appear open to surrounding wooded areas without defined boundary enclosures.",
+      "score": 85,
+      "mapsUrl": "https://www.google.com/maps/@30.23049620000005,-97.74117738853751,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "4501 Burleson Road",
+      "city": "Austin, Texas",
+      "lat": 30.213216200000023,
+      "lng": -97.73367639650137,
+      "signal": "No fencing detected",
+      "analysis": "Not a residential property — this appears to be an industrial or commercial building with large warehouse structures",
+      "score": 92,
+      "mapsUrl": "https://www.google.com/maps/@30.213216200000023,-97.73367639650137,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "4701 South 1st Street",
+      "city": "Austin, Texas",
+      "lat": 30.216096200000027,
+      "lng": -97.77534857447993,
+      "signal": "No fencing detected",
+      "analysis": "Not a residential property — skip",
+      "score": 99,
+      "mapsUrl": "https://www.google.com/maps/@30.216096200000027,-97.77534857447993,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "6108 Daffodil Drive",
+      "city": "Austin, Texas",
+      "lat": 30.21105620000002,
+      "lng": -97.7153406381908,
+      "signal": "No fencing detected",
+      "analysis": "This is a parking lot or multi-unit residential complex common area, not a single residential property with a defined yard.",
+      "score": 95,
+      "mapsUrl": "https://www.google.com/maps/@30.21105620000002,-97.7153406381908,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "TX 71",
+      "city": "Austin, Texas",
+      "lat": 30.215376200000026,
+      "lng": -97.73701017073965,
+      "signal": "No fencing detected",
+      "analysis": "This is an aerial view of a highway/road system, not a residential property.",
+      "score": 95,
+      "mapsUrl": "https://www.google.com/maps/@30.215376200000026,-97.73701017073965,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "500 Bramble Drive",
+      "city": "Austin, Texas",
+      "lat": 30.206736200000012,
+      "lng": -97.77951579227779,
+      "signal": "No fencing detected",
+      "analysis": "This appears to be a commercial or mixed-use property with parking areas and buildings rather than a residential house and yard.",
+      "score": 85,
+      "mapsUrl": "https://www.google.com/maps/@30.206736200000012,-97.77951579227779,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "Country Club Creek Trail",
+      "city": "Austin, Texas",
+      "lat": 30.239856200000066,
+      "lng": -97.71450719463122,
+      "signal": "No fencing detected",
+      "analysis": "Not a residential property — this is an aerial view of forested land with dirt roads, skip",
+      "score": 95,
+      "mapsUrl": "https://www.google.com/maps/@30.239856200000066,-97.71450719463122,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "5510 East Stassney Lane",
+      "city": "Austin, Texas",
+      "lat": 30.202416200000005,
+      "lng": -97.76701413888422,
+      "signal": "No fencing detected",
+      "analysis": "This is an aerial view of a commercial/industrial property with parking areas and buildings, not a residential property.",
+      "score": 95,
+      "mapsUrl": "https://www.google.com/maps/@30.202416200000005,-97.76701413888422,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "3001 South Congress Avenue",
+      "city": "Austin, Texas",
+      "lat": 30.231216200000052,
+      "lng": -97.7561793726098,
+      "signal": "No fencing detected",
+      "analysis": "This is a residential property with trees and structures, but no visible perimeter fencing enclosing the lot boundaries.",
+      "score": 85,
+      "mapsUrl": "https://www.google.com/maps/@30.231216200000052,-97.7561793726098,150m/data=!3m1!1e3"
+    },
+    {
+      "address": "South Lamar Boulevard",
+      "city": "Austin, Texas",
+      "lat": 30.239856200000066,
+      "lng": -97.78951711499265,
+      "signal": "No fencing detected",
+      "analysis": "This is a residential property, but no perimeter fencing is visible around the lot boundaries.",
+      "score": 85,
+      "mapsUrl": "https://www.google.com/maps/@30.239856200000066,-97.78951711499265,150m/data=!3m1!1e3"
+    }
+  ]
+}
