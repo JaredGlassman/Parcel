@@ -1,5 +1,5 @@
 /**
- * Append leads to the "AI Leads" Google Sheet via Apps Script webhook.
+ * Append leads to the "Parcel Leads" Google Sheet via Apps Script webhook.
  * Set GOOGLE_SHEETS_WEBHOOK_URL in Netlify env vars.
  * Setup: Extensions → Apps Script in your sheet, paste the doPost code below,
  * Deploy → New deployment → Web app → "Anyone" access → copy URL.
