@@ -311,7 +311,25 @@ export async function runLeadScan(zip: string, industry: string, limit: number):
     ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length)
     : 0
 
-  const pool = candidates.sort(() => Math.random() - 0.5).slice(0, limit * 3)
+  // Prioritize recent home sales: properties sold within the last 365 days are
+  // tried first (highest intent — new buyers shopping for home services).
+  // Older / no-sale-date properties fill remaining slots so we never starve.
+  // Inside each tier, shuffle for variety so we don't always return the same
+  // top-N for a given zip on every call.
+  const RECENT_DAYS = 365
+  const now = Date.now()
+  const daysSince = (d: string) => {
+    if (!d) return Infinity
+    const t = new Date(d).getTime()
+    if (isNaN(t)) return Infinity
+    return Math.floor((now - t) / 86400000)
+  }
+  const shuffled = candidates.slice().sort(() => Math.random() - 0.5)
+  const recent = shuffled.filter(c => daysSince(c.saleDate) <= RECENT_DAYS)
+                         .sort((a, b) => daysSince(a.saleDate) - daysSince(b.saleDate))
+  const older  = shuffled.filter(c => daysSince(c.saleDate) > RECENT_DAYS)
+  const pool = [...recent, ...older].slice(0, limit * 3)
+  console.log(`[capture] candidates: ${candidates.length} (${recent.length} sold ≤${RECENT_DAYS}d, ${older.length} older/unknown). pool size: ${pool.length}`)
 
   const results = await Promise.all(
     pool.map(async (prop) => {
