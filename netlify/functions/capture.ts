@@ -5,7 +5,7 @@
  */
 import { getStore } from '@netlify/blobs'
 import { runLeadScan, skipTrace } from './_analysis.ts'
-import { appendLeadsToSheet } from './_sheets.ts'
+import { appendLeadsToSheet, appendSignupToSheet } from './_sheets.ts'
 
 export interface Contact {
   id: string
@@ -126,7 +126,9 @@ export default async function handler(req: Request): Promise<Response> {
     if (existingIdx >= 0) index[existingIdx] = indexEntry
     else index.unshift(indexEntry)
     await store.set('index', JSON.stringify(index))
-    // Write leads to Google Sheet
+    // Write signup contact to "Signups" tab of the Parcel sheet
+    await appendSignupToSheet({ email, name, company, phone, zip, industry })
+    // Write delivered leads to the "Leads Delivered" tab
     await appendLeadsToSheet(leads, { zip, industry, email, name })
     // Lock phone so it can't claim free leads again
     await store.set(`phone:${phone}`, JSON.stringify({ email, claimedAt: now }))
